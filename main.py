@@ -18,9 +18,9 @@ users = db["users"]
 
 # قائمة القنوات التي يجب الاشتراك بها بالترتيب
 REQUIRED_CHANNELS = [
-    "@R2M199",
-    "@Nedfd_Root",
-    "@SNOKER_VIP",
+    "R2M199",
+    "Nedfd_Root",
+    "SNOKER_VIP",
 ]
 CHANNEL_EMOJIS = ["📫", "👾", "📚"]
 REWARDS = {
