@@ -9,18 +9,23 @@ import os
 # إعدادات البيئة
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 MONGO_URI = os.getenv("MONGO_URI")
-ADMIN_ID = int(os.getenv("ADMIN_ID"))
+ADMIN_ID = os.getenv("ADMIN_ID")
 
+# تحقق من الإعدادات
+if not all([BOT_TOKEN, MONGO_URI, ADMIN_ID]):
+    raise ValueError("❌ تأكد من ضبط متغيرات البيئة: BOT_TOKEN, MONGO_URI, ADMIN_ID")
+
+ADMIN_ID = int(ADMIN_ID)
 bot = telebot.TeleBot(BOT_TOKEN)
 client = MongoClient(MONGO_URI)
 db = client["telegram_bot_db_2"]
 users = db["users"]
 
-# قائمة القنوات التي يجب الاشتراك بها بالترتيب
+# القنوات المطلوبة بصيغة @username
 REQUIRED_CHANNELS = [
-    "R2M199",
-    "Nedfd_Root",
-    "SNOKER_VIP",
+    "@R2M199",
+    "@Nedfd_Root",
+    "@SNOKER_VIP",
 ]
 CHANNEL_EMOJIS = ["📫", "👾", "📚"]
 REWARDS = {
@@ -28,7 +33,7 @@ REWARDS = {
     "2": {"name": "🎫 بطاقة هدية", "cost": 25},
 }
 
-# Flask لإبقاء البوت حيًا
+# Flask لإبقاء البوت حي
 app = Flask(__name__)
 
 @app.route('/')
@@ -41,7 +46,7 @@ def run_flask():
 def run_bot():
     bot.infinity_polling()
 
-# دالة لإنشاء أو جلب المستخدم مع تخزين حالة التحقق من القنوات
+# دالة إنشاء المستخدم
 def get_or_create_user(user_id, ref=None):
     user = users.find_one({"_id": user_id})
     if not user:
@@ -58,15 +63,25 @@ def get_or_create_user(user_id, ref=None):
         user = users.find_one({"_id": user_id})
     return user
 
-# تحقق الاشتراك في قناة
+# التحقق من الاشتراك
 def check_channel_membership(user_id, channel):
     try:
-        chat = bot.get_chat(channel)
-        status = bot.get_chat_member(chat.id, user_id).status
+        status = bot.get_chat_member(channel, user_id).status
         return status in ["member", "creator", "administrator"]
     except:
         return False
 
+# رسالة القنوات
+def send_channel_message(user_id, index):
+    channel = REQUIRED_CHANNELS[index]
+    emoji = CHANNEL_EMOJIS[index]
+    text = (
+        f"لطفاً اشترك في القناة التالية ثم اضغط /start مرة أخرى:\n\n"
+        f"{emoji} : https://t.me/{channel.lstrip('@')}"
+    )
+    bot.send_message(user_id, text)
+
+# دالة بدء الاستخدام
 @bot.message_handler(commands=['start'])
 def start(msg):
     user_id = msg.from_user.id
@@ -74,37 +89,38 @@ def start(msg):
     ref = int(args[1]) if len(args) > 1 and args[1].isdigit() else None
     user = get_or_create_user(user_id, ref)
 
-    current_check_index = user.get("current_check_index", 0)
+    index = user.get("current_check_index", 0)
 
-    if current_check_index >= len(REQUIRED_CHANNELS):
-        invite_link = f"https://t.me/{bot.get_me().username}?start={user_id}"
-        text = (
-            f"👋 أهلاً بك {msg.from_user.first_name}!\n\n"
-            f"🎯 نقاطك: {user['points']}\n"
-            f"👥 عدد الإحالات: {user['referrals']}\n\n"
-            f"🔗 رابط دعوتك: {invite_link}\n\nاختر من القائمة:"
-        )
-        markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton("📊 رصيدي", callback_data="mypoints"))
-        markup.add(InlineKeyboardButton("🎁 استبدال نقاط", callback_data="rewards"))
-        markup.add(InlineKeyboardButton("🕓 نقاطي اليومية", callback_data="daily_points"))
-        bot.send_message(user_id, text, reply_markup=markup)
+    if index < len(REQUIRED_CHANNELS):
+        channel = REQUIRED_CHANNELS[index]
+        if not check_channel_membership(user_id, channel):
+            send_channel_message(user_id, index)
+            return
+        users.update_one({"_id": user_id}, {"$set": {"current_check_index": index + 1}})
+        start(msg)  # لا بأس بالتكرار مرة واحدة فقط بعد تحديث القناة
         return
 
-    channel_to_check = REQUIRED_CHANNELS[current_check_index]
-    emoji = CHANNEL_EMOJIS[current_check_index]
+    # القائمة الرئيسية
+    invite_link = f"https://t.me/{bot.get_me().username}?start={user_id}"
+    text = f"👋 أهلاً بك {msg.from_user.first_name}!\n\n"
+    text += f"🎯 نقاطك: {user['points']}\n👥 عدد الإحالات: {user['referrals']}\n\n"
+    text += f"🔗 رابط دعوتك: {invite_link}\n\nاختر من القائمة:"
 
-    if not check_channel_membership(user_id, channel_to_check):
-        text = (
-            f"لطفاً اشترك بالقناة التالية ثم اضغط /start مرة أخرى:\n\n"
-            f"{emoji} https://t.me/{channel_to_check}"
-        )
-        bot.send_message(user_id, text)
-        return
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("📊 رصيدي", callback_data="mypoints"))
+    markup.add(InlineKeyboardButton("🎁 استبدال نقاط", callback_data="rewards"))
+    markup.add(InlineKeyboardButton("🕓 نقاطي اليومية", callback_data="daily_points"))
+    bot.send_message(user_id, text, reply_markup=markup)
 
-    users.update_one({"_id": user_id}, {"$set": {"current_check_index": current_check_index + 1}})
-    start(msg)
+# عرض القنوات المطلوبة
+@bot.message_handler(commands=['channels'])
+def show_channels(msg):
+    text = "📢 القنوات التي يجب الاشتراك بها:\n\n"
+    for emoji, ch in zip(CHANNEL_EMOJIS, REQUIRED_CHANNELS):
+        text += f"{emoji} https://t.me/{ch.lstrip('@')}\n"
+    bot.send_message(msg.chat.id, text)
 
+# الأزرار التفاعلية
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     user_id = call.from_user.id
@@ -130,7 +146,7 @@ def callback_handler(call):
             if user['points'] >= reward['cost']:
                 users.update_one({"_id": user_id}, {"$inc": {"points": -reward['cost']}})
                 bot.send_message(user_id, f"✅ تم استبدال {reward['name']}! سيتم التواصل معك قريبًا.")
-                bot.send_message(ADMIN_ID, f"📥 مستخدم {user_id} استبدل {reward['name']}")
+                bot.send_message(ADMIN_ID, f"📥 المستخدم @{call.from_user.username or 'بدون_اسم'} (ID: {user_id}) استبدل {reward['name']}")
             else:
                 bot.send_message(user_id, "❌ لا تملك نقاط كافية!")
 
@@ -146,6 +162,7 @@ def callback_handler(call):
             minutes = (remaining.seconds % 3600) // 60
             bot.send_message(user_id, f"⏳ يمكنك الحصول على نقاطك اليومية بعد {hours} ساعة و {minutes} دقيقة.")
 
+# أمر شحن النقاط من قبل المالك
 @bot.message_handler(commands=['addpoints'])
 def add_points(msg):
     if msg.from_user.id != ADMIN_ID:
@@ -154,12 +171,16 @@ def add_points(msg):
     if len(parts) != 3:
         bot.reply_to(msg, "❌ الصيغة: /addpoints <user_id> <amount>")
         return
-    user_id = int(parts[1])
-    amount = int(parts[2])
-    users.update_one({"_id": user_id}, {"$inc": {"points": amount}})
-    bot.send_message(user_id, f"✅ تم إضافة {amount} نقطة إلى حسابك!")
-    bot.reply_to(msg, "✅ تم الشحن.")
+    try:
+        user_id = int(parts[1])
+        amount = int(parts[2])
+        users.update_one({"_id": user_id}, {"$inc": {"points": amount}})
+        bot.send_message(user_id, f"✅ تم إضافة {amount} نقطة إلى حسابك!")
+        bot.reply_to(msg, "✅ تم الشحن.")
+    except:
+        bot.reply_to(msg, "❌ حدث خطأ، تأكد من المعرف والقيمة.")
 
+# تشغيل Flask والبوت
 if __name__ == "__main__":
     threading.Thread(target=run_flask).start()
     threading.Thread(target=run_bot).start()
