@@ -94,19 +94,19 @@ def start(msg):
     channel_to_check = REQUIRED_CHANNELS[current_check_index]
     emoji = CHANNEL_EMOJIS[current_check_index]
 
-    if not check_channel_membership(user_id, channel_to_check):
-        # يطلب الاشتراك في القناة الحالية
-        text = (
-    "لطفاً، يرجى الاشتراك في القناة لاستخدام البوت.\n"
-    "ثم اضغط على /start من جديد.\n\n"
-    "قناة البوت 👾👇🏻\n"
-    f"🔗 : {channel_to_check}"
-)
-bot.send_message(user_id, text)
-        return
+   if not check_channel_membership(user_id, channel_to_check):
+    # يطلب الاشتراك في القناة الحالية
+    text = (
+        "لطفاً، يرجى الاشتراك في القناة لاستخدام البوت.\n"
+        "ثم اضغط على /start من جديد.\n\n"
+        "قناة البوت 👾👇🏻\n"
+        f"🔗 : {channel_to_check}"
+    )
+    bot.send_message(user_id, text)
+    return
 
-    # إذا المستخدم مشترك بالقناة، نحدث الحالة للقناة التالية
-    users.update_one({"_id": user_id}, {"$set": {"current_check_index": current_check_index + 1}})
+# إذا المستخدم مشترك بالقناة، نحدث الحالة للقناة التالية
+users.update_one({"_id": user_id}, {"$set": {"current_check_index": current_check_index + 1}})
 
     # نعيد استدعاء دالة start ليتم التحقق من القناة التالية أو السماح باستخدام البوت
     start(msg)
