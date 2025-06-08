@@ -97,7 +97,7 @@ def start(msg):
     if not check_channel_membership(user_id, channel_to_check):
         text = (
             f"لطفاً اشترك بالقناة التالية ثم اضغط /start مرة أخرى:\n\n"
-            f"{emoji} {channel_to_check}"
+            f"{emoji} https://t.me/{channel_to_check}"
         )
         bot.send_message(user_id, text)
         return
