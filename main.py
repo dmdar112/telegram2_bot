@@ -22,7 +22,7 @@ REQUIRED_CHANNELS = [
     "https://t.me/Nedfd_Root",
     "https://t.me/SNOKER_VIP",
 ]
-CHANNEL_EMOJIS = ["📫", "👾", "📚"]  # نفس ترتيب REQUIRED_CHANNELS
+CHANNEL_EMOJIS = ["📫", "👾", "📚"]
 REWARDS = {
     "1": {"name": "🎁 كود شحن", "cost": 10},
     "2": {"name": "🎫 بطاقة هدية", "cost": 25},
@@ -51,17 +51,18 @@ def get_or_create_user(user_id, ref=None):
             "referrals": 0,
             "invited_by": ref,
             "last_daily": None,
-            "current_check_index": 0  # لتتبع القناة التي يجب الاشتراك بها حالياً
+            "current_check_index": 0
         })
         if ref and ref != user_id:
             users.update_one({"_id": ref}, {"$inc": {"points": 1, "referrals": 1}})
         user = users.find_one({"_id": user_id})
     return user
 
-# دالة تحقق الاشتراك في قناة محددة
+# تحقق الاشتراك في قناة
 def check_channel_membership(user_id, channel):
     try:
-        status = bot.get_chat_member(channel, user_id).status
+        chat = bot.get_chat(channel)
+        status = bot.get_chat_member(chat.id, user_id).status
         return status in ["member", "creator", "administrator"]
     except:
         return False
@@ -75,14 +76,14 @@ def start(msg):
 
     current_check_index = user.get("current_check_index", 0)
 
-    # تحقق إذا انتهى المستخدم من الاشتراك في كل القنوات المطلوبة
     if current_check_index >= len(REQUIRED_CHANNELS):
-        # يسمح له باستخدام البوت
         invite_link = f"https://t.me/{bot.get_me().username}?start={user_id}"
-        text = f"👋 أهلاً بك {msg.from_user.first_name}!\n\n"
-        text += f"🎯 نقاطك: {user['points']}\n👥 عدد الإحالات: {user['referrals']}\n\n"
-        text += f"🔗 رابط دعوتك: {invite_link}\n\nاختر من القائمة:"
-
+        text = (
+            f"👋 أهلاً بك {msg.from_user.first_name}!\n\n"
+            f"🎯 نقاطك: {user['points']}\n"
+            f"👥 عدد الإحالات: {user['referrals']}\n\n"
+            f"🔗 رابط دعوتك: {invite_link}\n\nاختر من القائمة:"
+        )
         markup = InlineKeyboardMarkup()
         markup.add(InlineKeyboardButton("📊 رصيدي", callback_data="mypoints"))
         markup.add(InlineKeyboardButton("🎁 استبدال نقاط", callback_data="rewards"))
@@ -90,24 +91,18 @@ def start(msg):
         bot.send_message(user_id, text, reply_markup=markup)
         return
 
-    # القناة التي يجب على المستخدم الاشتراك بها الآن مع الإيموجي
     channel_to_check = REQUIRED_CHANNELS[current_check_index]
     emoji = CHANNEL_EMOJIS[current_check_index]
 
-   if not check_channel_membership(user_id, channel_to_check):
-    text = (
-        "لطفاً، يرجى الاشتراك في القناة لاستخدام البوت.\n"
-        "ثم اضغط على /start من جديد.\n\n"
-        "قناة البوت 👾👇🏻\n"
-        f"🔗 : {channel_to_check}"
-    )
-    bot.send_message(user_id, text)
-    return
+    if not check_channel_membership(user_id, channel_to_check):
+        text = (
+            f"لطفاً اشترك بالقناة التالية ثم اضغط /start مرة أخرى:\n\n"
+            f"{emoji} {channel_to_check}"
+        )
+        bot.send_message(user_id, text)
+        return
 
-# إذا المستخدم مشترك بالقناة، نحدث الحالة للقناة التالية
-users.update_one({"_id": user_id}, {"$set": {"current_check_index": current_check_index + 1}})
-
-    # نعيد استدعاء دالة start ليتم التحقق من القناة التالية أو السماح باستخدام البوت
+    users.update_one({"_id": user_id}, {"$set": {"current_check_index": current_check_index + 1}})
     start(msg)
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -168,4 +163,4 @@ def add_points(msg):
 if __name__ == "__main__":
     threading.Thread(target=run_flask).start()
     threading.Thread(target=run_bot).start()
-    threading.Event().wait()  # يبقي البرنامج شغال للأبد
+    threading.Event().wait()
