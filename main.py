@@ -12,9 +12,9 @@ MONGO_URI = os.getenv("MONGO_URI")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
 bot = telebot.TeleBot(BOT_TOKEN)
-client = MongoClient(MONGO_URI)
-db = client['billion_bot']
-users = db['users']
+client = MongoClient(MONGODB_URI)
+db = client["telegram_bot_db_2"]
+users = db["users"]
 
 # قائمة القنوات التي يجب الاشتراك بها بالترتيب
 REQUIRED_CHANNELS = [
