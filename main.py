@@ -12,7 +12,7 @@ MONGO_URI = os.getenv("MONGO_URI")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
 bot = telebot.TeleBot(BOT_TOKEN)
-client = MongoClient(MONGODB_URI)
+client = MongoClient(MONGO_URI)
 db = client["telegram_bot_db_2"]
 users = db["users"]
 
