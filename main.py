@@ -95,7 +95,6 @@ def start(msg):
     emoji = CHANNEL_EMOJIS[current_check_index]
 
    if not check_channel_membership(user_id, channel_to_check):
-    # يطلب الاشتراك في القناة الحالية
     text = (
         "لطفاً، يرجى الاشتراك في القناة لاستخدام البوت.\n"
         "ثم اضغط على /start من جديد.\n\n"
